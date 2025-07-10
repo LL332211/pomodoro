@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポモドーロタイマー</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #a8c8ec 0%, #c3d5f0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #2c4a6b;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.3);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(69, 130, 202, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            min-width: 400px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            font-weight: 300;
+        }
+
+        .timer-display {
+            font-size: 4em;
+            font-weight: bold;
+            margin: 30px 0;
+            color: #2c4a6b;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .session-type {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.4);
+            color: #2c4a6b;
+            border: 2px solid rgba(69, 130, 202, 0.3);
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(69, 130, 202, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .start-btn {
+            background: rgba(130, 180, 220, 0.7);
+        }
+
+        .pause-btn {
+            background: rgba(160, 200, 240, 0.7);
+        }
+
+        .reset-btn {
+            background: rgba(140, 170, 210, 0.7);
+        }
+
+        .progress-ring {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 20px auto;
+        }
+
+        .progress-ring svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring-circle {
+            fill: transparent;
+            stroke: rgba(69, 130, 202, 0.3);
+            stroke-width: 8;
+            stroke-linecap: round;
+        }
+
+        .progress-ring-progress {
+            fill: transparent;
+            stroke: #4582ca;
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 942;
+            stroke-dashoffset: 942;
+            transition: stroke-dashoffset 1s linear;
+        }
+
+        .timer-display-in-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3em;
+            font-weight: bold;
+        }
+
+        .stats {
+            margin-top: 20px;
+            opacity: 0.8;
+        }
+
+        .work-session {
+            background: linear-gradient(135deg, #a8c8ec 0%, #9bb8e0 100%);
+        }
+
+        .break-session {
+            background: linear-gradient(135deg, #b8d2f0 0%, #a5c0e8 100%);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ポモドーロタイマー</h1>
+        
+        <div class="session-type" id="sessionType">作業時間</div>
+        
+        <div class="progress-ring">
+            <svg>
+                <circle class="progress-ring-circle" cx="150" cy="150" r="140"></circle>
+                <circle class="progress-ring-progress" cx="150" cy="150" r="140" id="progressCircle"></circle>
+            </svg>
+            <div class="timer-display-in-ring" id="timerDisplay">25:00</div>
+        </div>
+        
+        <div class="controls">
+            <button class="start-btn" id="startBtn" onclick="startTimer()">開始</button>
+            <button class="pause-btn" id="pauseBtn" onclick="pauseTimer()">一時停止</button>
+            <button class="reset-btn" id="resetBtn" onclick="resetTimer()">リセット</button>
+        </div>
+        
+        <div class="stats">
+            <p>完了したポモドーロ: <span id="completedSessions">0</span></p>
+        </div>
+    </div>
+
+    <script>
+        let timer;
+        let isRunning = false;
+        let currentSession = 'work';
+        let timeLeft = 25 * 60;
+        let completedSessions = 0;
+        let totalTime = 25 * 60;
+
+        const timerDisplay = document.getElementById('timerDisplay');
+        const sessionType = document.getElementById('sessionType');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const progressCircle = document.getElementById('progressCircle');
+        const completedSessionsDisplay = document.getElementById('completedSessions');
+        const body = document.body;
+
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            const progress = (totalTime - timeLeft) / totalTime;
+            const circumference = 2 * Math.PI * 140;
+            const offset = circumference - (progress * circumference);
+            progressCircle.style.strokeDashoffset = offset;
+        }
+
+        function playNotificationSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
+
+        function switchSession() {
+            if (currentSession === 'work') {
+                currentSession = 'break';
+                timeLeft = 5 * 60;
+                totalTime = 5 * 60;
+                sessionType.textContent = '休憩時間';
+                body.className = 'break-session';
+                completedSessions++;
+                completedSessionsDisplay.textContent = completedSessions;
+            } else {
+                currentSession = 'work';
+                timeLeft = 25 * 60;
+                totalTime = 25 * 60;
+                sessionType.textContent = '作業時間';
+                body.className = 'work-session';
+            }
+            updateDisplay();
+        }
+
+        function startTimer() {
+            if (!isRunning) {
+                isRunning = true;
+                startBtn.textContent = '実行中...';
+                startBtn.disabled = true;
+                
+                timer = setInterval(() => {
+                    timeLeft--;
+                    updateDisplay();
+                    
+                    if (timeLeft <= 0) {
+                        clearInterval(timer);
+                        isRunning = false;
+                        startBtn.textContent = '開始';
+                        startBtn.disabled = false;
+                        playNotificationSound();
+                        
+                        setTimeout(() => {
+                            alert(currentSession === 'work' ? '作業時間終了！休憩しましょう。' : '休憩時間終了！作業を再開しましょう。');
+                            switchSession();
+                        }, 100);
+                    }
+                }, 1000);
+            }
+        }
+
+        function pauseTimer() {
+            if (isRunning) {
+                clearInterval(timer);
+                isRunning = false;
+                startBtn.textContent = '再開';
+                startBtn.disabled = false;
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timer);
+            isRunning = false;
+            currentSession = 'work';
+            timeLeft = 25 * 60;
+            totalTime = 25 * 60;
+            sessionType.textContent = '作業時間';
+            startBtn.textContent = '開始';
+            startBtn.disabled = false;
+            body.className = '';
+            updateDisplay();
+        }
+
+        updateDisplay();
+    </script>
+</body>
+</html>
